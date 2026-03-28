@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "role", "createdAt"]
+    },
+    "ArisanGroup": {
+      "title": "Arisan Group",
+      "description": "Arisan group configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "contribution": { "type": "number" },
+        "frequency": { "type": "string", "enum": ["weekly", "monthly"] },
+        "maxMembers": { "type": "number" },
+        "system": { "type": "string", "enum": ["random", "sequential", "manual"] },
+        "adminId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "pending", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "contribution", "frequency", "maxMembers", "system", "adminId", "status", "createdAt"]
+    },
+    "Membership": {
+      "title": "Membership",
+      "description": "User membership in a group",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string" },
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["groupId", "userId", "status", "joinedAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment record for a group",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "groupId": { "type": "string" },
+        "userId": { "type": "string" },
+        "period": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "late"] },
+        "proofUrl": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "groupId", "userId", "period", "amount", "status", "timestamp"]
+    },
+    "Draw": {
+      "title": "Winner Draw",
+      "description": "Record of a winner draw",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "groupId": { "type": "string" },
+        "winnerId": { "type": "string" },
+        "period": { "type": "string" },
+        "amount": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "groupId", "winnerId", "period", "amount", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles"
+    },
+    "/groups/{groupId}": {
+      "schema": "ArisanGroup",
+      "description": "Arisan groups"
+    },
+    "/memberships/{membershipId}": {
+      "schema": "Membership",
+      "description": "Group memberships"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment records"
+    },
+    "/draws/{drawId}": {
+      "schema": "Draw",
+      "description": "Winner draw records"
+    }
+  }
+}

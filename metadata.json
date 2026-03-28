@@ -1,0 +1,5 @@
+{
+  "name": "Arisan App",
+  "description": "Aplikasi pengelolaan arisan (offline/online) untuk memonitor pembayaran, pemenang, dan jadwal secara transparan.",
+  "requestFramePermissions": []
+}

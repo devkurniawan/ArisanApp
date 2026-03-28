@@ -1,0 +1,167 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string (required)
+    //   - email: string (required, email format)
+    //   - photoURL: string (optional)
+    //   - role: string (required, 'admin' or 'member')
+    //   - createdAt: string (required, date-time format)
+    //
+    // Collection: groups
+    // Document ID: groupId
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - contribution: number (required)
+    //   - frequency: string (required, 'weekly' or 'monthly')
+    //   - maxMembers: number (required)
+    //   - system: string (required, 'random', 'sequential', 'manual')
+    //   - adminId: string (required)
+    //   - status: string (required, 'active', 'pending', 'completed')
+    //   - createdAt: string (required, date-time format)
+    //
+    // Collection: memberships
+    // Document ID: membershipId (groupId_userId)
+    // Fields:
+    //   - groupId: string (required)
+    //   - userId: string (required)
+    //   - status: string (required, 'pending', 'approved', 'rejected')
+    //   - joinedAt: string (required, date-time format)
+    //
+    // Collection: payments
+    // Document ID: paymentId
+    // Fields:
+    //   - id: string (required)
+    //   - groupId: string (required)
+    //   - userId: string (required)
+    //   - period: string (required)
+    //   - amount: number (required)
+    //   - status: string (required, 'pending', 'paid', 'late')
+    //   - proofUrl: string (optional)
+    //   - timestamp: string (required, date-time format)
+    //
+    // Collection: draws
+    // Document ID: drawId
+    // Fields:
+    //   - id: string (required)
+    //   - groupId: string (required)
+    //   - winnerId: string (required)
+    //   - period: string (required)
+    //   - amount: number (required)
+    //   - timestamp: string (required, date-time format)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "dev.kurniawan.e@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['admin', 'member'] &&
+             data.createdAt is string;
+    }
+
+    function isValidGroup(data) {
+      return data.keys().hasAll(['id', 'name', 'contribution', 'frequency', 'maxMembers', 'system', 'adminId', 'status', 'createdAt']) &&
+             data.id is string && data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.contribution is number && data.contribution > 0 &&
+             data.frequency in ['weekly', 'monthly'] &&
+             data.maxMembers is number && data.maxMembers >= 2 &&
+             data.system in ['random', 'sequential', 'manual'] &&
+             data.adminId is string &&
+             data.status in ['active', 'pending', 'completed'] &&
+             data.createdAt is string;
+    }
+
+    function isValidMembership(data) {
+      return data.keys().hasAll(['groupId', 'userId', 'status', 'joinedAt']) &&
+             data.groupId is string && data.userId is string &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.joinedAt is string;
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['id', 'groupId', 'userId', 'period', 'amount', 'status', 'timestamp']) &&
+             data.id is string && data.groupId is string && data.userId is string &&
+             data.period is string &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['pending', 'paid', 'late'] &&
+             data.timestamp is string;
+    }
+
+    function isValidDraw(data) {
+      return data.keys().hasAll(['id', 'groupId', 'winnerId', 'period', 'amount', 'timestamp']) &&
+             data.id is string && data.groupId is string && data.winnerId is string &&
+             data.period is string &&
+             data.amount is number && data.amount > 0 &&
+             data.timestamp is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'member';
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || isAdmin();
+    }
+
+    match /groups/{groupId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidGroup(request.resource.data) && request.resource.data.adminId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidGroup(request.resource.data) && (resource.data.adminId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.adminId == request.auth.uid || isAdmin());
+    }
+
+    match /memberships/{membershipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMembership(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidMembership(request.resource.data) && 
+                    (get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.adminId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && 
+                    (resource.data.userId == request.auth.uid || 
+                     get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.adminId == request.auth.uid || 
+                     isAdmin());
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPayment(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidPayment(request.resource.data) && 
+                    (get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.adminId == request.auth.uid || isAdmin());
+    }
+
+    match /draws/{drawId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDraw(request.resource.data) && 
+                    (get(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.adminId == request.auth.uid || isAdmin());
+    }
+  }
+}
